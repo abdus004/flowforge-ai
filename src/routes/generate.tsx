@@ -70,7 +70,27 @@ function GeneratePage() {
     e.preventDefault();
     if (!description.trim()) return;
     setLoading(true);
-    setTimeout(() => navigate({ to: "/result" }), 1200);
+    const payload = {
+      name,
+      description,
+      teamSize,
+      experience,
+      timelineValue,
+      timelineUnit,
+      workflow,
+    };
+    try {
+      sessionStorage.setItem("flowforge:project", JSON.stringify(payload));
+    } catch {
+      // ignore
+    }
+    setTimeout(() => {
+      if (workflow === "compare") {
+        navigate({ to: "/compare" });
+      } else {
+        navigate({ to: "/result" });
+      }
+    }, 1000);
   };
 
   return (
