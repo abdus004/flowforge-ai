@@ -27,7 +27,6 @@ function Landing() {
       <Features />
       <HowItWorks />
       <WhyFlowForge />
-      <CTA />
     </SiteLayout>
   );
 }
