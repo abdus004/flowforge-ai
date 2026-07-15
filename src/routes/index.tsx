@@ -27,7 +27,6 @@ function Landing() {
       <Features />
       <HowItWorks />
       <WhyFlowForge />
-      <CTA />
     </SiteLayout>
   );
 }
@@ -63,7 +62,7 @@ function Hero() {
               size="lg"
               className="group rounded-full gradient-brand-bg px-6 text-white shadow-lg hover:opacity-90"
             >
-              Get Started
+              Start Building
               <ArrowRight className="ml-1 h-4 w-4 transition group-hover:translate-x-0.5" />
             </Button>
           </Link>
@@ -273,37 +272,6 @@ function WhyFlowForge() {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function CTA() {
-  return (
-    <section className="px-4 pt-32">
-      <div className="mx-auto max-w-4xl">
-        <div className="glass relative overflow-hidden rounded-[2rem] p-10 text-center sm:p-16">
-          <div className="absolute -top-20 left-1/2 -z-10 h-64 w-[80%] -translate-x-1/2 gradient-brand-bg opacity-40 blur-3xl" />
-          <h2 className="font-display text-3xl font-bold tracking-tight sm:text-5xl">
-            Ready to <span className="gradient-text">forge your blueprint?</span>
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-            Start with a single sentence. Leave with a complete plan.
-          </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Link to="/generate">
-              <Button size="lg" className="rounded-full gradient-brand-bg px-6 text-white hover:opacity-90">
-                Generate Blueprint
-                <ArrowRight className="ml-1 h-4 w-4" />
-              </Button>
-            </Link>
-            <Link to="/compare">
-              <Button size="lg" variant="outline" className="rounded-full px-6">
-                Compare Workflows
-              </Button>
-            </Link>
           </div>
         </div>
       </div>
