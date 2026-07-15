@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ResultRouteImport } from './routes/result'
 import { Route as GenerateRouteImport } from './routes/generate'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as IndexRouteImport } from './routes/index'
 
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResultRoute = ResultRouteImport.update({
   id: '/result',
   path: '/result',
@@ -40,12 +46,14 @@ export interface FileRoutesByFullPath {
   '/compare': typeof CompareRoute
   '/generate': typeof GenerateRoute
   '/result': typeof ResultRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/compare': typeof CompareRoute
   '/generate': typeof GenerateRoute
   '/result': typeof ResultRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,14 @@ export interface FileRoutesById {
   '/compare': typeof CompareRoute
   '/generate': typeof GenerateRoute
   '/result': typeof ResultRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/compare' | '/generate' | '/result'
+  fullPaths: '/' | '/compare' | '/generate' | '/result' | '/sitemap.xml'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/compare' | '/generate' | '/result'
-  id: '__root__' | '/' | '/compare' | '/generate' | '/result'
+  to: '/' | '/compare' | '/generate' | '/result' | '/sitemap.xml'
+  id: '__root__' | '/' | '/compare' | '/generate' | '/result' | '/sitemap.xml'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,10 +76,18 @@ export interface RootRouteChildren {
   CompareRoute: typeof CompareRoute
   GenerateRoute: typeof GenerateRoute
   ResultRoute: typeof ResultRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/result': {
       id: '/result'
       path: '/result'
@@ -107,6 +124,7 @@ const rootRouteChildren: RootRouteChildren = {
   CompareRoute: CompareRoute,
   GenerateRoute: GenerateRoute,
   ResultRoute: ResultRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
