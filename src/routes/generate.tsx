@@ -1,11 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Sparkles, ArrowRight, Loader2, Lightbulb } from "lucide-react";
-import { SiteLayout } from "@/components/site-layout";
+import { ArrowRight, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/generate")({
   head: () => ({
@@ -20,50 +26,75 @@ export const Route = createFileRoute("/generate")({
   component: GeneratePage,
 });
 
-const EXAMPLES = [
-  "A collaborative recipe app with AI meal planning for busy families.",
-  "A B2B invoicing SaaS with automated reminders and Stripe payouts.",
-  "A learning platform that generates personalized study paths from PDFs.",
+type Workflow = "traditional" | "ai-assisted" | "full-ai" | "compare";
+
+const WORKFLOWS: {
+  value: Workflow;
+  title: string;
+  description: string;
+}[] = [
+  {
+    value: "traditional",
+    title: "Traditional",
+    description: "Manual development with minimal AI assistance.",
+  },
+  {
+    value: "ai-assisted",
+    title: "AI Assisted",
+    description: "Balance between AI tools and manual coding.",
+  },
+  {
+    value: "full-ai",
+    title: "Full AI",
+    description: "Use AI throughout the entire development process.",
+  },
+  {
+    value: "compare",
+    title: "Compare & Recommend",
+    description: "Compare every workflow and let AI recommend the best one.",
+  },
 ];
 
 function GeneratePage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
-  const [idea, setIdea] = useState("");
-  const [audience, setAudience] = useState("");
-  const [stack, setStack] = useState("Modern web (React + Node)");
+  const [description, setDescription] = useState("");
+  const [teamSize, setTeamSize] = useState("");
+  const [experience, setExperience] = useState("");
+  const [timelineValue, setTimelineValue] = useState("");
+  const [timelineUnit, setTimelineUnit] = useState("weeks");
+  const [workflow, setWorkflow] = useState<Workflow | "">("");
   const [loading, setLoading] = useState(false);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!idea.trim()) return;
+    if (!description.trim()) return;
     setLoading(true);
     setTimeout(() => navigate({ to: "/result" }), 1200);
   };
 
   return (
-    <SiteLayout>
-      <section className="px-4">
-        <div className="mx-auto max-w-4xl text-center">
+    <div className="min-h-screen px-4 py-10 sm:py-14">
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-10 text-center">
           <div className="glass mx-auto inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium text-muted-foreground">
             <Sparkles className="h-3 w-3 text-primary" />
             Blueprint Generator
           </div>
-          <h1 className="mt-6 font-display text-4xl font-bold sm:text-5xl">
-            Describe your <span className="gradient-text">product idea</span>
+          <h1 className="mt-5 font-display text-3xl font-bold sm:text-4xl">
+            Project <span className="gradient-text">Workspace</span>
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-            The more detail you share, the sharper your blueprint. Include users, jobs to
-            be done, and any known constraints.
+          <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
+            Tell us about your project. We will turn your inputs into a complete development blueprint.
           </p>
         </div>
 
         <form
           onSubmit={submit}
-          className="glass mx-auto mt-10 max-w-4xl rounded-3xl p-6 sm:p-10"
+          className="glass rounded-3xl p-6 sm:p-10"
         >
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Project name">
+          <div className="space-y-6">
+            <Field label="Project Name">
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -71,83 +102,124 @@ function GeneratePage() {
                 className="rounded-xl bg-background/50"
               />
             </Field>
-            <Field label="Target audience">
-              <Input
-                value={audience}
-                onChange={(e) => setAudience(e.target.value)}
-                placeholder="e.g. Freelance designers"
-                className="rounded-xl bg-background/50"
-              />
-            </Field>
-          </div>
 
-          <div className="mt-5">
-            <Field label="Preferred stack (optional)">
-              <Input
-                value={stack}
-                onChange={(e) => setStack(e.target.value)}
-                className="rounded-xl bg-background/50"
-              />
-            </Field>
-          </div>
-
-          <div className="mt-5">
-            <Field label="Describe your idea">
+            <Field label="Project Description">
               <Textarea
                 required
-                value={idea}
-                onChange={(e) => setIdea(e.target.value)}
-                placeholder="A tool that helps indie makers turn their journal entries into launch-ready product briefs..."
-                className="min-h-40 rounded-2xl bg-background/50"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe what you want to build, its main features, goals and any important requirements."
+                className="min-h-36 rounded-2xl bg-background/50"
               />
             </Field>
+
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field label="Team Size">
+                <Input
+                  type="number"
+                  min={1}
+                  value={teamSize}
+                  onChange={(e) => setTeamSize(e.target.value)}
+                  placeholder="e.g. 3"
+                  className="rounded-xl bg-background/50"
+                />
+              </Field>
+
+              <Field label="Experience Level">
+                <Select value={experience} onValueChange={setExperience}>
+                  <SelectTrigger className="rounded-xl bg-background/50">
+                    <SelectValue placeholder="Select level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="beginner">Beginner</SelectItem>
+                    <SelectItem value="intermediate">Intermediate</SelectItem>
+                    <SelectItem value="advanced">Advanced</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+
+            <Field label="Project Timeline">
+              <div className="grid grid-cols-[1fr_auto] gap-3">
+                <Input
+                  type="number"
+                  min={1}
+                  value={timelineValue}
+                  onChange={(e) => setTimelineValue(e.target.value)}
+                  placeholder="e.g. 4"
+                  className="rounded-xl bg-background/50"
+                />
+                <Select value={timelineUnit} onValueChange={setTimelineUnit}>
+                  <SelectTrigger className="w-32 rounded-xl bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="days">Days</SelectItem>
+                    <SelectItem value="weeks">Weeks</SelectItem>
+                    <SelectItem value="months">Months</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </Field>
+
+            <div>
+              <Label className="mb-3 block text-sm font-medium">Development Workflow</Label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {WORKFLOWS.map((w) => (
+                  <button
+                    key={w.value}
+                    type="button"
+                    onClick={() => setWorkflow(w.value)}
+                    className={`glass rounded-2xl p-5 text-left transition ${
+                      workflow === w.value
+                        ? "border-primary/60 ring-1 ring-primary"
+                        : "hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-display text-base font-semibold">
+                        {w.title}
+                      </span>
+                      <span
+                        className={`h-4 w-4 rounded-full border-2 ${
+                          workflow === w.value
+                            ? "border-primary bg-primary"
+                            : "border-muted-foreground/40"
+                        }`}
+                      />
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                      {w.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
-          <div className="mt-6 rounded-2xl border border-dashed border-border/70 bg-background/30 p-5">
-            <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-              <Lightbulb className="h-4 w-4 text-primary" />
-              Need inspiration?
-            </div>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {EXAMPLES.map((ex) => (
-                <button
-                  key={ex}
-                  type="button"
-                  onClick={() => setIdea(ex)}
-                  className="rounded-xl border border-border/60 bg-background/40 p-3 text-left text-xs text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
-                >
-                  {ex}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              Blueprints typically take under 30 seconds to generate.
-            </p>
+          <div className="mt-10 flex justify-center">
             <Button
               type="submit"
               size="lg"
               disabled={loading}
-              className="rounded-full gradient-brand-bg px-6 text-white hover:opacity-90"
+              className="rounded-full gradient-brand-bg px-10 text-white hover:opacity-90"
             >
               {loading ? (
                 <>
-                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Forging blueprint...
                 </>
               ) : (
                 <>
                   Generate Blueprint
-                  <ArrowRight className="ml-1 h-4 w-4" />
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </>
               )}
             </Button>
           </div>
         </form>
-      </section>
-    </SiteLayout>
+      </div>
+    </div>
   );
 }
 
