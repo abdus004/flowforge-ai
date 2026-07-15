@@ -35,7 +35,6 @@ export function Footer() {
             title="Product"
             items={[
               { label: "Generate", to: "/generate" },
-              { label: "Workflows", to: "/compare" },
               { label: "Features", to: "/#features" },
             ]}
           />

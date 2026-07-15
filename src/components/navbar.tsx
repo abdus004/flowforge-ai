@@ -8,10 +8,9 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
 
   const links = [
-    { to: "/", label: "Home" },
+    { to: "/#top", label: "Home" },
     { to: "/#features", label: "Features" },
     { to: "/#about", label: "About" },
-    { to: "/compare", label: "Workflows" },
   ] as const;
 
   return (
