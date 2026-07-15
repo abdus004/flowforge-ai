@@ -2,7 +2,6 @@ import { Link } from "@tanstack/react-router";
 import { Moon, Sun, Sparkles, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "./theme-provider";
-import { Button } from "./ui/button";
 
 export function Navbar() {
   const { theme, toggle } = useTheme();
@@ -45,11 +44,6 @@ export function Navbar() {
           >
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
-          <Link to="/generate" className="hidden sm:block">
-            <Button className="rounded-full gradient-brand-bg text-white hover:opacity-90">
-              Generate Blueprint
-            </Button>
-          </Link>
           <button
             aria-label="Menu"
             onClick={() => setOpen((o) => !o)}
@@ -72,11 +66,6 @@ export function Navbar() {
               {l.label}
             </a>
           ))}
-          <Link to="/generate" onClick={() => setOpen(false)}>
-            <Button className="mt-1 w-full rounded-full gradient-brand-bg text-white">
-              Generate Blueprint
-            </Button>
-          </Link>
         </div>
       )}
     </header>
