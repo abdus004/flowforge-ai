@@ -51,9 +51,8 @@ function Hero() {
         </h1>
 
         <p className="mx-auto mt-6 max-w-2xl text-base text-muted-foreground sm:text-lg">
-          Transform your software ideas into complete AI-generated development blueprints
-          including workflows, architecture, database design, AI recommendations and
-          implementation plans.
+          Transform your software ideas into complete AI-generated development blueprints including
+          workflows, architecture, database design, AI recommendations and implementation plans.
         </p>
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -233,9 +232,21 @@ function HowItWorks() {
 }
 
 const WHY = [
-  { icon: Zap, title: "10x faster planning", body: "Compress weeks of scoping into minutes without cutting corners." },
-  { icon: Rocket, title: "Production-ready output", body: "Blueprints reflect real-world constraints and modern stacks." },
-  { icon: CheckCircle2, title: "Opinionated but flexible", body: "Sensible defaults with room to compare and swap decisions." },
+  {
+    icon: Zap,
+    title: "10x faster planning",
+    body: "Compress weeks of scoping into minutes without cutting corners.",
+  },
+  {
+    icon: Rocket,
+    title: "Production-ready output",
+    body: "Blueprints reflect real-world constraints and modern stacks.",
+  },
+  {
+    icon: CheckCircle2,
+    title: "Opinionated but flexible",
+    body: "Sensible defaults with room to compare and swap decisions.",
+  },
 ];
 
 function WhyFlowForge() {
@@ -249,11 +260,12 @@ function WhyFlowForge() {
                 Why FlowForge AI
               </div>
               <h2 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
-                The <span className="gradient-text">architect co-pilot</span> your team has been missing.
+                The <span className="gradient-text">architect co-pilot</span> your team has been
+                missing.
               </h2>
               <p className="mt-4 text-muted-foreground">
-                FlowForge combines domain-aware reasoning with battle-tested architecture
-                patterns — so every blueprint feels handcrafted, not templated.
+                FlowForge combines domain-aware reasoning with battle-tested architecture patterns —
+                so every blueprint feels handcrafted, not templated.
               </p>
             </div>
             <div className="grid gap-4">
@@ -293,9 +305,7 @@ function SectionHeader({
       <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
         {eyebrow}
       </div>
-      <h2 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
-        {title}
-      </h2>
+      <h2 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">{title}</h2>
       <p className="mt-4 text-muted-foreground">{subtitle}</p>
     </div>
   );

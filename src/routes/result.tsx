@@ -16,8 +16,19 @@ import {
   GitBranch,
   Timer,
   ClipboardList,
+  ShieldAlert,
+  FileWarning,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import type { Blueprint, RealWorkflow } from "@/lib/api";
+import { loadBlueprint, loadProject, type StoredProject } from "@/lib/project-storage";
 
 export const Route = createFileRoute("/result")({
   head: () => ({
@@ -33,19 +44,7 @@ export const Route = createFileRoute("/result")({
   component: ResultPage,
 });
 
-type WorkflowId = "traditional" | "ai-assisted" | "full-ai";
-
-type Project = {
-  name: string;
-  description: string;
-  teamSize: string;
-  experience: string;
-  timelineValue: string;
-  timelineUnit: "days" | "weeks" | "months" | string;
-  workflow: WorkflowId | "compare" | "";
-};
-
-const WORKFLOW_LABEL: Record<WorkflowId, string> = {
+const WORKFLOW_LABEL: Record<RealWorkflow, string> = {
   traditional: "Traditional",
   "ai-assisted": "AI Assisted",
   "full-ai": "Full AI",
@@ -61,45 +60,86 @@ const SECTIONS = [
   { id: "structure", label: "Structure", icon: FolderTree },
   { id: "flow", label: "Dev Flow", icon: GitBranch },
   { id: "effort", label: "Effort", icon: Timer },
+  { id: "risks", label: "Risks", icon: ShieldAlert },
   { id: "next", label: "Next Steps", icon: ClipboardList },
 ];
 
 function ResultPage() {
-  const [project, setProject] = useState<Project | null>(null);
+  const [project, setProject] = useState<StoredProject | null>(null);
+  const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem("flowforge:project");
-      if (raw) setProject(JSON.parse(raw));
-    } catch {
-      // ignore
-    }
+    setProject(loadProject());
+    setBlueprint(loadBlueprint());
+    setReady(true);
   }, []);
 
-  const activeWorkflow: WorkflowId = useMemo(() => {
+  const activeWorkflow: RealWorkflow = useMemo(() => {
     const w = project?.workflow;
     if (w === "traditional" || w === "ai-assisted" || w === "full-ai") return w;
     return "ai-assisted";
   }, [project]);
 
-  const timelineValue = Math.max(1, parseInt(project?.timelineValue || "4", 10) || 4);
-  const timelineUnit = (project?.timelineUnit || "weeks") as Project["timelineUnit"];
+  const timelineValue = project?.timelineValue || "—";
+  const timelineUnit = project?.timelineUnit || "weeks";
 
-  const confidence = useMemo(() => {
-    let score = 70;
-    const tv = timelineValue;
-    if (tv >= 3 && tv <= 12) score += 10;
-    if (project?.experience === "advanced") score += 10;
-    if (project?.experience === "intermediate") score += 6;
-    if (project?.description && project.description.length > 120) score += 8;
-    return Math.min(96, score);
-  }, [project, timelineValue]);
+  if (ready && !blueprint) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="glass max-w-md rounded-3xl p-10 text-center">
+          <FileWarning className="mx-auto h-10 w-10 text-primary" />
+          <h1 className="mt-4 font-display text-xl font-semibold">No blueprint yet</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            We couldn't find a generated blueprint for this session. Head back to the generator to
+            create one.
+          </p>
+          <Link
+            to="/generate"
+            className="mt-6 inline-flex items-center justify-center rounded-full gradient-brand-bg px-6 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
+          >
+            Go to generator
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
-  const workflowSteps = getWorkflowSteps(activeWorkflow);
-  const architecture = getArchitecture(activeWorkflow);
-  const aiStack = getAIStack(activeWorkflow);
-  const roadmap = buildRoadmap(timelineValue, timelineUnit);
-  const effort = getEffort(activeWorkflow);
+  if (!blueprint) {
+    return <div className="min-h-screen" />;
+  }
+
+  const projectName = blueprint.project.name || project?.name || "Untitled Project";
+
+  const exportJson = () => {
+    downloadFile(
+      `${slug(projectName)}-blueprint.json`,
+      JSON.stringify(blueprint, null, 2),
+      "application/json",
+    );
+    toast.success("Blueprint exported as JSON.");
+  };
+
+  const exportMarkdown = () => {
+    downloadFile(
+      `${slug(projectName)}-blueprint.md`,
+      toMarkdown(blueprint, projectName),
+      "text/markdown",
+    );
+    toast.success("Blueprint exported as Markdown.");
+  };
+
+  const share = async () => {
+    const summary = toMarkdown(blueprint, projectName);
+    try {
+      await navigator.clipboard.writeText(summary);
+      toast.success("Blueprint copied to clipboard — paste it anywhere to share.", {
+        description: "Persistent shareable links require backend storage, coming later.",
+      });
+    } catch {
+      toast.error("Couldn't access the clipboard. Try exporting instead.");
+    }
+  };
 
   return (
     <div className="min-h-screen px-4 py-10 sm:py-14">
@@ -118,34 +158,49 @@ function ResultPage() {
                 <Sparkles className="h-3 w-3" /> Blueprint ready
               </div>
               <h1 className="mt-4 font-display text-3xl font-bold sm:text-4xl">
-                {project?.name || "Untitled Project"} —{" "}
-                <span className="gradient-text">AI Blueprint</span>
+                {projectName} — <span className="gradient-text">AI Blueprint</span>
               </h1>
               <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-                FlowForge AI analyzed your requirements and generated a complete development
-                blueprint including workflow, architecture, database design, AI stack,
-                implementation roadmap and recommended tools.
+                {blueprint.project.summary}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" className="rounded-full">
+              <Button variant="outline" className="rounded-full" onClick={share}>
                 <Share2 className="mr-1 h-4 w-4" /> Share
               </Button>
-              <Button className="rounded-full gradient-brand-bg text-white hover:opacity-90">
-                <Download className="mr-1 h-4 w-4" /> Export
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button className="rounded-full gradient-brand-bg text-white hover:opacity-90">
+                    <Download className="mr-1 h-4 w-4" /> Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={exportJson}>Export as JSON</DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportMarkdown}>Export as Markdown</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Stat k="Workflow" v={WORKFLOW_LABEL[activeWorkflow]} />
-            <Stat
-              k="Timeline"
-              v={`${timelineValue} ${cap(timelineUnit)}`}
-            />
+            <Stat k="Timeline" v={`${timelineValue} ${cap(timelineUnit)}`} />
             <Stat k="Team Size" v={project?.teamSize ? `${project.teamSize} people` : "—"} />
-            <Stat k="Confidence" v={`${confidence}%`} />
+            <Stat k="Database" v={blueprint.database.databaseType || "—"} />
           </div>
+
+          {blueprint.project.goals.length > 0 && (
+            <div className="mt-5 flex flex-wrap gap-2">
+              {blueprint.project.goals.map((g) => (
+                <span
+                  key={g}
+                  className="rounded-full border border-border/60 bg-background/40 px-3 py-1 text-xs text-muted-foreground"
+                >
+                  {g}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -172,8 +227,13 @@ function ResultPage() {
 
           <div className="space-y-6">
             <BlueprintCard id="workflow" icon={Workflow} title="User & System Workflow">
+              {blueprint.workflow.recommendationReason && (
+                <p className="mb-4 text-sm text-muted-foreground">
+                  {blueprint.workflow.recommendationReason}
+                </p>
+              )}
               <ol className="space-y-3 text-sm">
-                {workflowSteps.map((step, i) => (
+                {blueprint.workflow.steps.map((step, i) => (
                   <li key={i} className="flex gap-3">
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full gradient-brand-bg text-[11px] font-bold text-white">
                       {i + 1}
@@ -185,96 +245,171 @@ function ResultPage() {
             </BlueprintCard>
 
             <BlueprintCard id="architecture" icon={Layers} title="System Architecture">
+              {blueprint.architecture.overview && (
+                <p className="mb-4 text-sm text-muted-foreground">
+                  {blueprint.architecture.overview}
+                </p>
+              )}
               <div className="grid gap-3 sm:grid-cols-2">
-                {architecture.map((b) => (
-                  <TileCard key={b.t} title={b.t} desc={b.d} />
+                {blueprint.architecture.components.map((c) => (
+                  <TileCard key={c.name} title={c.name} desc={`${c.technology} — ${c.purpose}`} />
                 ))}
               </div>
+              {blueprint.architecture.dataFlow.length > 0 && (
+                <div className="mt-5">
+                  <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Data Flow
+                  </div>
+                  <ol className="space-y-1.5 text-xs text-muted-foreground">
+                    {blueprint.architecture.dataFlow.map((d, i) => (
+                      <li key={i}>
+                        {i + 1}. {d}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
             </BlueprintCard>
 
             <BlueprintCard id="database" icon={Database} title="Database Design">
               <div className="space-y-5 text-sm">
-                <SubBlock title="Entities">
+                <SubBlock title={`Entities (${blueprint.database.databaseType})`}>
                   <div className="flex flex-wrap gap-2">
-                    {["User", "Project", "Workspace", "Item", "ActivityLog", "Setting"].map(
-                      (e) => (
-                        <span
-                          key={e}
-                          className="rounded-full border border-border/60 bg-background/40 px-3 py-1 text-xs text-muted-foreground"
-                        >
-                          {e}
-                        </span>
-                      ),
-                    )}
+                    {blueprint.database.entities.map((e) => (
+                      <span
+                        key={e.name}
+                        className="rounded-full border border-border/60 bg-background/40 px-3 py-1 text-xs text-muted-foreground"
+                      >
+                        {e.name}
+                      </span>
+                    ))}
                   </div>
                 </SubBlock>
 
-                <SubBlock title="Relationships">
-                  <ul className="space-y-1.5 text-xs text-muted-foreground">
-                    <li>• User 1 — n Workspace (owner)</li>
-                    <li>• Workspace 1 — n Project</li>
-                    <li>• Project 1 — n Item</li>
-                    <li>• User 1 — n ActivityLog</li>
-                  </ul>
-                </SubBlock>
+                {blueprint.database.entities.some((e) => e.relationships.length > 0) && (
+                  <SubBlock title="Relationships">
+                    <ul className="space-y-1.5 text-xs text-muted-foreground">
+                      {blueprint.database.entities.flatMap((e) =>
+                        e.relationships.map((r, i) => <li key={`${e.name}-${i}`}>• {r}</li>),
+                      )}
+                    </ul>
+                  </SubBlock>
+                )}
 
-                <SubBlock title="Key Tables">
+                <SubBlock title="Entity Details">
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {[
-                      { t: "users", d: "Auth accounts, profile, preferences." },
-                      { t: "workspaces", d: "Team-level container for projects." },
-                      { t: "projects", d: "Blueprints and generated artifacts." },
-                      { t: "items", d: "Individual entities inside a project." },
-                      { t: "activity_logs", d: "Audit trail for user actions." },
-                      { t: "settings", d: "Per-user and per-workspace config." },
-                    ].map((r) => (
+                    {blueprint.database.entities.map((e) => (
                       <div
-                        key={r.t}
+                        key={e.name}
                         className="rounded-2xl border border-border/60 bg-background/40 p-4"
                       >
                         <div className="font-mono text-xs font-semibold text-foreground">
-                          {r.t}
+                          {e.name}
                         </div>
-                        <div className="mt-1 text-xs text-muted-foreground">{r.d}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{e.description}</div>
+                        {e.fields.length > 0 && (
+                          <div className="mt-2 text-[11px] text-muted-foreground/80">
+                            {e.fields.join(", ")}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
                 </SubBlock>
 
-                <SubBlock title="Indexes">
-                  <ul className="space-y-1.5 font-mono text-xs text-muted-foreground">
-                    <li>• ix_projects_workspace  btree(workspace_id, created_at desc)</li>
-                    <li>• ix_items_project        btree(project_id)</li>
-                    <li>• ix_activity_user_time   btree(user_id, created_at desc)</li>
-                  </ul>
-                </SubBlock>
+                {blueprint.database.indexes.length > 0 && (
+                  <SubBlock title="Indexes">
+                    <ul className="space-y-1.5 font-mono text-xs text-muted-foreground">
+                      {blueprint.database.indexes.map((idx, i) => (
+                        <li key={i}>• {idx}</li>
+                      ))}
+                    </ul>
+                  </SubBlock>
+                )}
+
+                {blueprint.database.notes.length > 0 && (
+                  <SubBlock title="Notes">
+                    <ul className="space-y-1.5 text-xs text-muted-foreground">
+                      {blueprint.database.notes.map((n, i) => (
+                        <li key={i}>• {n}</li>
+                      ))}
+                    </ul>
+                  </SubBlock>
+                )}
               </div>
             </BlueprintCard>
 
             <BlueprintCard id="ai" icon={Brain} title="Recommended AI Stack">
               <div className="grid gap-3 sm:grid-cols-2">
-                {aiStack.map((b) => (
-                  <TileCard key={b.t} title={b.t} desc={b.d} />
-                ))}
+                {blueprint.aiStack.llm && (
+                  <TileCard
+                    title={`LLM — ${blueprint.aiStack.llm.name}`}
+                    desc={blueprint.aiStack.llm.reason}
+                  />
+                )}
+                {blueprint.aiStack.embeddingModel && (
+                  <TileCard
+                    title={`Embeddings — ${blueprint.aiStack.embeddingModel.name}`}
+                    desc={blueprint.aiStack.embeddingModel.reason}
+                  />
+                )}
+                {blueprint.aiStack.vectorDatabase && (
+                  <TileCard
+                    title={`Vector DB — ${blueprint.aiStack.vectorDatabase.name}`}
+                    desc={blueprint.aiStack.vectorDatabase.reason}
+                  />
+                )}
               </div>
+              {blueprint.aiStack.rag && (
+                <p className="mt-4 text-sm text-muted-foreground">{blueprint.aiStack.rag}</p>
+              )}
+              {blueprint.aiStack.aiFeatures.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {blueprint.aiStack.aiFeatures.map((f) => (
+                    <span
+                      key={f}
+                      className="rounded-full bg-primary/10 px-3 py-1 text-xs text-primary"
+                    >
+                      {f}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {!blueprint.aiStack.llm &&
+                !blueprint.aiStack.embeddingModel &&
+                !blueprint.aiStack.vectorDatabase && (
+                  <p className="text-sm text-muted-foreground">
+                    FlowForge AI determined this project doesn't need a dedicated AI stack beyond
+                    what was requested.
+                  </p>
+                )}
             </BlueprintCard>
 
             <BlueprintCard id="roadmap" icon={ListChecks} title="Implementation Roadmap">
               <div className="space-y-3">
-                {roadmap.map((m) => (
+                {blueprint.roadmap.map((m, i) => (
                   <div
-                    key={m.p}
+                    key={i}
                     className="flex gap-4 rounded-2xl border border-border/60 bg-background/40 p-4"
                   >
                     <div className="w-24 shrink-0 font-display text-lg font-bold gradient-text">
-                      {m.p}
+                      {m.duration}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 text-sm font-semibold">
                         <CheckCircle2 className="h-4 w-4 text-primary" />
-                        {m.t}
+                        {m.phase}
                       </div>
-                      <div className="mt-1 text-xs text-muted-foreground">{m.d}</div>
+                      {m.objectives.length > 0 && (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {m.objectives.join(" • ")}
+                        </div>
+                      )}
+                      {m.deliverables.length > 0 && (
+                        <div className="mt-1 text-[11px] text-muted-foreground/80">
+                          Deliverables: {m.deliverables.join(", ")}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -283,27 +418,15 @@ function ResultPage() {
 
             <BlueprintCard id="tools" icon={Wrench} title="Recommended Development Tools">
               <div className="grid gap-3 sm:grid-cols-2">
-                {[
-                  { t: "Lovable", p: "AI app builder", r: "Ship full-stack apps from prompts." },
-                  { t: "Supabase", p: "Backend & database", r: "Auth, Postgres and storage in one." },
-                  { t: "Gemini AI", p: "LLM & multimodal", r: "Fast, cost-efficient generation." },
-                  { t: "GitHub", p: "Source control", r: "Collaboration, PRs and CI/CD." },
-                  { t: "VS Code", p: "Editor", r: "Extensible IDE with AI plugins." },
-                  { t: "Vercel", p: "Hosting", r: "Zero-config edge deployments." },
-                  { t: "Figma", p: "UI design", r: "Design systems and prototyping." },
-                  { t: "Postman", p: "API testing", r: "Debug and document endpoints." },
-                ].map((tl) => (
-                  <div
-                    key={tl.t}
-                    className="rounded-2xl border border-border/60 bg-background/40 p-4"
-                  >
+                {blueprint.tools.map((tl, i) => (
+                  <div key={i} className="rounded-2xl border border-border/60 bg-background/40 p-4">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm font-semibold">{tl.t}</div>
+                      <div className="text-sm font-semibold">{tl.name}</div>
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                        {tl.p}
+                        {tl.category}
                       </span>
                     </div>
-                    <div className="mt-2 text-xs text-muted-foreground">{tl.r}</div>
+                    <div className="mt-2 text-xs text-muted-foreground">{tl.purpose}</div>
                   </div>
                 ))}
               </div>
@@ -311,52 +434,21 @@ function ResultPage() {
 
             <BlueprintCard id="structure" icon={FolderTree} title="Project Folder Structure">
               <pre className="overflow-x-auto rounded-2xl border border-border/60 bg-background/60 p-5 font-mono text-xs leading-relaxed text-muted-foreground">
-{`${slug(project?.name) || "project"}/
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── hooks/
-│   │   └── lib/
-│   └── public/
-├── backend/
-│   ├── src/
-│   │   ├── routes/
-│   │   ├── services/
-│   │   └── utils/
-│   └── tests/
-├── database/
-│   ├── migrations/
-│   └── seed/
-├── docs/
-│   ├── architecture.md
-│   └── api.md
-├── public/
-└── README.md`}
+                {blueprint.projectStructure
+                  .map((item) => `${item.path}    ${item.purpose}`)
+                  .join("\n")}
               </pre>
             </BlueprintCard>
 
             <BlueprintCard id="flow" icon={GitBranch} title="Development Flow">
               <div className="flex flex-wrap gap-2">
-                {[
-                  "Requirements",
-                  "UI Design",
-                  "Frontend",
-                  "Backend",
-                  "Database",
-                  "Authentication",
-                  "AI Integration",
-                  "Testing",
-                  "Deployment",
-                ].map((step, i, arr) => (
-                  <div key={step} className="flex items-center gap-2">
+                {blueprint.developmentFlow.map((step, i, arr) => (
+                  <div key={i} className="flex items-center gap-2">
                     <div className="rounded-full border border-border/60 bg-background/40 px-3 py-1.5 text-xs font-medium">
                       <span className="mr-1.5 text-primary">{i + 1}.</span>
                       {step}
                     </div>
-                    {i < arr.length - 1 && (
-                      <span className="text-muted-foreground/60">→</span>
-                    )}
+                    {i < arr.length - 1 && <span className="text-muted-foreground/60">→</span>}
                   </div>
                 ))}
               </div>
@@ -364,38 +456,53 @@ function ResultPage() {
 
             <BlueprintCard id="effort" icon={Timer} title="Estimated Development Effort">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {effort.map((e) => (
-                  <div
-                    key={e.t}
-                    className="rounded-2xl border border-border/60 bg-background/40 p-4"
-                  >
-                    <div className="text-sm font-semibold">{e.t}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{e.d}</div>
+                {blueprint.effort.map((e, i) => (
+                  <div key={i} className="rounded-2xl border border-border/60 bg-background/40 p-4">
+                    <div className="text-sm font-semibold">{e.area}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      ~{e.estimatedDays} {e.estimatedDays === 1 ? "day" : "days"}
+                    </div>
+                    <div className="mt-1 text-[11px] text-muted-foreground/80">{e.reason}</div>
                   </div>
                 ))}
                 <div className="rounded-2xl gradient-brand-bg p-4 text-white sm:col-span-2 lg:col-span-1">
                   <div className="text-sm font-semibold">Overall Estimated Time</div>
                   <div className="mt-1 text-xs opacity-90">
-                    ~{timelineValue} {cap(timelineUnit)} end-to-end
+                    ~{blueprint.effort.reduce((sum, e) => sum + e.estimatedDays, 0)} days total ·
+                    Target {timelineValue} {cap(timelineUnit)}
                   </div>
                 </div>
               </div>
             </BlueprintCard>
 
+            {blueprint.risks.length > 0 && (
+              <BlueprintCard id="risks" icon={ShieldAlert} title="Key Risks & Mitigations">
+                <div className="space-y-3">
+                  {blueprint.risks.map((r, i) => (
+                    <div
+                      key={i}
+                      className="rounded-2xl border border-border/60 bg-background/40 p-4"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-sm font-semibold">{r.risk}</div>
+                        <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
+                          {r.impact} impact
+                        </span>
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        Mitigation: {r.mitigation}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </BlueprintCard>
+            )}
+
             <BlueprintCard id="next" icon={ClipboardList} title="Next Steps">
               <ul className="space-y-2 text-sm">
-                {[
-                  "Create GitHub Repository",
-                  "Design UI in Figma",
-                  "Setup Supabase project",
-                  "Setup Gemini API keys",
-                  "Develop Frontend",
-                  "Develop Backend",
-                  "Run Tests",
-                  "Deploy to production",
-                ].map((step) => (
+                {blueprint.nextSteps.map((step, i) => (
                   <li
-                    key={step}
+                    key={i}
                     className="flex items-center gap-3 rounded-xl border border-border/60 bg-background/40 px-4 py-2.5"
                   >
                     <span className="grid h-5 w-5 place-items-center rounded-md border border-border/60">
@@ -473,107 +580,83 @@ function cap(s: string) {
 }
 
 function slug(s?: string) {
-  return (s || "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  return (
+    (s || "project")
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "project"
+  );
 }
 
-function getWorkflowSteps(w: WorkflowId): string[] {
-  if (w === "traditional") {
-    return [
-      "Gather product requirements and write specs.",
-      "Design UI in Figma and review with stakeholders.",
-      "Manually build frontend components and pages.",
-      "Implement backend APIs and database schema.",
-      "Write tests, fix bugs and prepare release.",
-      "Deploy to production and monitor.",
-    ];
+function downloadFile(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function toMarkdown(bp: Blueprint, projectName: string): string {
+  const list = (items: string[]) => items.map((i) => `- ${i}`).join("\n");
+  const lines: string[] = [];
+
+  lines.push(`# ${projectName} — AI Development Blueprint`);
+  lines.push("");
+  lines.push(bp.project.summary);
+  if (bp.project.goals.length) {
+    lines.push("", "## Goals", list(bp.project.goals));
   }
-  if (w === "full-ai") {
-    return [
-      "Describe the project in natural language.",
-      "AI drafts UI, backend and database from the prompt.",
-      "Review generated code and iterate with follow-up prompts.",
-      "AI writes tests and fixes issues automatically.",
-      "One-click deploy to production.",
-      "AI monitors and suggests improvements.",
-    ];
+  if (bp.project.assumptions.length) {
+    lines.push("", "## Assumptions", list(bp.project.assumptions));
   }
-  return [
-    "Define requirements and outline user flows.",
-    "Use AI to draft UI components and layouts.",
-    "Hand-tune business logic and integrations.",
-    "AI assists with backend endpoints and schema.",
-    "Pair-program tests with AI, refine manually.",
-    "Deploy with CI/CD and observe in production.",
-  ];
-}
 
-function getArchitecture(w: WorkflowId) {
-  const base = [
-    { t: "Frontend", d: "React + Vite, TanStack Router, Tailwind." },
-    { t: "Backend", d: "Node (Hono) API on edge runtime." },
-    { t: "Database", d: "Postgres with typed schema and RLS." },
-    { t: "Authentication", d: "Email + OAuth via managed auth provider." },
-    { t: "Storage", d: "Object storage for uploads and exports." },
-    { t: "AI Services", d: "LLM + embeddings behind a thin gateway." },
-    { t: "Deployment", d: "Edge hosting with preview environments." },
-  ];
-  if (w === "traditional") base[5].d = "Optional AI microservice for specific features.";
-  if (w === "full-ai") base[5].d = "AI at every layer — generation, retrieval and QA.";
-  return base;
-}
+  lines.push("", "## Workflow", `**${bp.workflow.name}** — ${bp.workflow.recommendationReason}`);
+  lines.push(bp.workflow.steps.map((s, i) => `${i + 1}. ${s}`).join("\n"));
 
-function getAIStack(w: WorkflowId) {
-  return [
-    {
-      t: "LLM",
-      d: `Gemini 2.5 Flash — ${w === "full-ai" ? "primary reasoning engine across the stack." : "cost-efficient generation for user features."}`,
-    },
-    {
-      t: "Embedding Model",
-      d: "text-embedding-3-small (1536 dims) — strong recall at low cost.",
-    },
-    { t: "Database", d: "Postgres + pgvector — hybrid keyword + vector search." },
-    { t: "Authentication", d: "Supabase Auth — email, OAuth and RLS out of the box." },
-    { t: "Hosting", d: "Vercel — global edge with instant previews." },
-    { t: "Frontend Framework", d: "React 19 with TanStack Router for typed routing." },
-    { t: "Backend Framework", d: "Hono — fast, portable, works on edge runtimes." },
-    { t: "Deployment Platform", d: "Vercel + GitHub Actions for CI/CD." },
-  ];
-}
+  lines.push("", "## Architecture", bp.architecture.overview);
+  bp.architecture.components.forEach((c) => {
+    lines.push(`- **${c.name}** (${c.technology}) — ${c.purpose}`);
+  });
 
-function buildRoadmap(value: number, unit: Project["timelineUnit"]) {
-  const labelUnit =
-    unit === "days" ? "Day" : unit === "months" ? "Month" : "Week";
-  const count = Math.max(1, Math.min(8, value));
-  const templates = [
-    { t: "Foundations", d: "Auth, base UI kit, project scaffolding." },
-    { t: "Core Features", d: "Primary user flows and data models." },
-    { t: "AI Integration", d: "LLM, embeddings, retrieval and prompts." },
-    { t: "Polish & Launch", d: "Onboarding, billing hooks, observability." },
-    { t: "Iteration", d: "User feedback loops and refinements." },
-    { t: "Scale", d: "Performance, caching, cost tuning." },
-    { t: "Hardening", d: "Security review, load tests, backups." },
-    { t: "Growth", d: "Analytics, experiments and integrations." },
-  ];
-  return Array.from({ length: count }, (_, i) => ({
-    p: `${labelUnit} ${i + 1}`,
-    ...templates[i % templates.length],
-  }));
-}
+  lines.push("", `## Database (${bp.database.databaseType})`);
+  bp.database.entities.forEach((e) => {
+    lines.push(`- **${e.name}** — ${e.description}`);
+  });
 
-function getEffort(w: WorkflowId) {
-  const speed = w === "full-ai" ? 0.5 : w === "ai-assisted" ? 0.75 : 1;
-  const est = (base: number) => `${Math.max(1, Math.round(base * speed))} days`;
-  return [
-    { t: "UI Development", d: est(8) },
-    { t: "Backend", d: est(7) },
-    { t: "Database", d: est(3) },
-    { t: "AI Integration", d: est(5) },
-    { t: "Testing", d: est(4) },
-    { t: "Deployment", d: est(2) },
-  ];
+  lines.push("", "## AI Stack");
+  if (bp.aiStack.llm) lines.push(`- LLM: ${bp.aiStack.llm.name} — ${bp.aiStack.llm.reason}`);
+  if (bp.aiStack.embeddingModel)
+    lines.push(
+      `- Embeddings: ${bp.aiStack.embeddingModel.name} — ${bp.aiStack.embeddingModel.reason}`,
+    );
+  if (bp.aiStack.vectorDatabase)
+    lines.push(
+      `- Vector DB: ${bp.aiStack.vectorDatabase.name} — ${bp.aiStack.vectorDatabase.reason}`,
+    );
+  if (bp.aiStack.rag) lines.push(`- RAG: ${bp.aiStack.rag}`);
+
+  lines.push("", "## Roadmap");
+  bp.roadmap.forEach((m) => {
+    lines.push(`### ${m.phase} (${m.duration})`);
+    if (m.objectives.length) lines.push(list(m.objectives));
+  });
+
+  lines.push("", "## Tools");
+  bp.tools.forEach((t) => lines.push(`- **${t.name}** (${t.category}) — ${t.purpose}`));
+
+  lines.push("", "## Next Steps", list(bp.nextSteps));
+
+  if (bp.risks.length) {
+    lines.push("", "## Risks");
+    bp.risks.forEach((r) =>
+      lines.push(`- **${r.risk}** (${r.impact} impact) — Mitigation: ${r.mitigation}`),
+    );
+  }
+
+  return lines.join("\n");
 }

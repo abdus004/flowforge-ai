@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowRight, Loader2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ApiError, generateBlueprint, type ExperienceLevel, type RealWorkflow } from "@/lib/api";
+import { saveBlueprint, saveProject } from "@/lib/project-storage";
 
 export const Route = createFileRoute("/generate")({
   head: () => ({
@@ -26,7 +29,7 @@ export const Route = createFileRoute("/generate")({
   component: GeneratePage,
 });
 
-type Workflow = "traditional" | "ai-assisted" | "full-ai" | "compare";
+type Workflow = RealWorkflow | "compare";
 
 const WORKFLOWS: {
   value: Workflow;
@@ -55,42 +58,94 @@ const WORKFLOWS: {
   },
 ];
 
+function validate(fields: {
+  description: string;
+  teamSize: string;
+  experience: string;
+  timelineValue: string;
+  workflow: string;
+}): string | null {
+  if (!fields.description.trim() || fields.description.trim().length < 10) {
+    return "Please describe your project in at least 10 characters.";
+  }
+  const team = parseInt(fields.teamSize, 10);
+  if (!fields.teamSize || Number.isNaN(team) || team <= 0) {
+    return "Team size must be a positive number.";
+  }
+  if (!fields.experience) {
+    return "Please select an experience level.";
+  }
+  const timeline = parseInt(fields.timelineValue, 10);
+  if (!fields.timelineValue || Number.isNaN(timeline) || timeline <= 0) {
+    return "Timeline must be a positive number.";
+  }
+  if (!fields.workflow) {
+    return "Please choose a development workflow.";
+  }
+  return null;
+}
+
 function GeneratePage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [teamSize, setTeamSize] = useState("");
-  const [experience, setExperience] = useState("");
+  const [experience, setExperience] = useState<ExperienceLevel | "">("");
   const [timelineValue, setTimelineValue] = useState("");
-  const [timelineUnit, setTimelineUnit] = useState("weeks");
+  const [timelineUnit, setTimelineUnit] = useState<"days" | "weeks" | "months">("weeks");
   const [workflow, setWorkflow] = useState<Workflow | "">("");
   const [loading, setLoading] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description.trim()) return;
-    setLoading(true);
-    const payload = {
-      name,
+    if (loading) return;
+
+    const validationError = validate({
       description,
       teamSize,
       experience,
       timelineValue,
-      timelineUnit,
       workflow,
-    };
-    try {
-      sessionStorage.setItem("flowforge:project", JSON.stringify(payload));
-    } catch {
-      // ignore
+    });
+    if (validationError) {
+      toast.error(validationError);
+      return;
     }
-    setTimeout(() => {
-      if (workflow === "compare") {
-        navigate({ to: "/compare" });
-      } else {
-        navigate({ to: "/result" });
-      }
-    }, 1000);
+
+    const project = {
+      name: name.trim(),
+      description: description.trim(),
+      teamSize,
+      experience: experience as ExperienceLevel,
+      timelineValue,
+      timelineUnit,
+      workflow: workflow as Workflow,
+    };
+
+    saveProject(project);
+
+    if (workflow === "compare") {
+      navigate({ to: "/compare" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const blueprint = await generateBlueprint({
+        ...project,
+        workflow: workflow as RealWorkflow,
+      });
+      saveBlueprint(blueprint);
+      navigate({ to: "/result" });
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : "Something went wrong while generating your blueprint. Please try again.";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -105,14 +160,12 @@ function GeneratePage() {
             Project <span className="gradient-text">Workspace</span>
           </h1>
           <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
-            Tell us about your project. We will turn your inputs into a complete development blueprint.
+            Tell us about your project. We will turn your inputs into a complete development
+            blueprint.
           </p>
         </div>
 
-        <form
-          onSubmit={submit}
-          className="glass rounded-3xl p-6 sm:p-10"
-        >
+        <form onSubmit={submit} className="glass rounded-3xl p-6 sm:p-10">
           <div className="space-y-6">
             <Field label="Project Name">
               <Input
@@ -120,6 +173,7 @@ function GeneratePage() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Nimbus Notes"
                 className="rounded-xl bg-background/50"
+                disabled={loading}
               />
             </Field>
 
@@ -130,6 +184,7 @@ function GeneratePage() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe what you want to build, its main features, goals and any important requirements."
                 className="min-h-36 rounded-2xl bg-background/50"
+                disabled={loading}
               />
             </Field>
 
@@ -142,11 +197,16 @@ function GeneratePage() {
                   onChange={(e) => setTeamSize(e.target.value)}
                   placeholder="e.g. 3"
                   className="rounded-xl bg-background/50"
+                  disabled={loading}
                 />
               </Field>
 
               <Field label="Experience Level">
-                <Select value={experience} onValueChange={setExperience}>
+                <Select
+                  value={experience}
+                  onValueChange={(v) => setExperience(v as ExperienceLevel)}
+                  disabled={loading}
+                >
                   <SelectTrigger className="rounded-xl bg-background/50">
                     <SelectValue placeholder="Select level" />
                   </SelectTrigger>
@@ -168,8 +228,13 @@ function GeneratePage() {
                   onChange={(e) => setTimelineValue(e.target.value)}
                   placeholder="e.g. 4"
                   className="rounded-xl bg-background/50"
+                  disabled={loading}
                 />
-                <Select value={timelineUnit} onValueChange={setTimelineUnit}>
+                <Select
+                  value={timelineUnit}
+                  onValueChange={(v) => setTimelineUnit(v as "days" | "weeks" | "months")}
+                  disabled={loading}
+                >
                   <SelectTrigger className="w-32 rounded-xl bg-background/50">
                     <SelectValue />
                   </SelectTrigger>
@@ -189,17 +254,16 @@ function GeneratePage() {
                   <button
                     key={w.value}
                     type="button"
+                    disabled={loading}
                     onClick={() => setWorkflow(w.value)}
-                    className={`glass rounded-2xl p-5 text-left transition ${
+                    className={`glass rounded-2xl p-5 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
                       workflow === w.value
                         ? "border-primary/60 ring-1 ring-primary"
                         : "hover:border-primary/40"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <span className="font-display text-base font-semibold">
-                        {w.title}
-                      </span>
+                      <span className="font-display text-base font-semibold">{w.title}</span>
                       <span
                         className={`h-4 w-4 rounded-full border-2 ${
                           workflow === w.value

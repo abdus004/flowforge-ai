@@ -65,13 +65,7 @@ export function Footer() {
   );
 }
 
-function FooterCol({
-  title,
-  items,
-}: {
-  title: string;
-  items: { label: string; to: string }[];
-}) {
+function FooterCol({ title, items }: { title: string; items: { label: string; to: string }[] }) {
   return (
     <div>
       <h4 className="mb-4 text-sm font-semibold">{title}</h4>
