@@ -56,3 +56,5 @@ Thumbs.db
 *.sw?
 *.bak
 *.tmp
+# Local startup scripts
+start-windows.ps1
